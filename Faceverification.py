@@ -1,43 +1,67 @@
-import streamlit as st
-import cv2
 import numpy as np
 from PIL import Image
+import cv2
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.applications.resnet50 import preprocess_input
+import gdown
 
-def face_similarity_check(image1, image2):
-    # Convert PIL Images to numpy arrays
-    image1 = np.array(image1)
-    image2 = np.array(image2)
+# Download the pre-trained model
+@st.cache_resource
+def download_model():
+    url = 'https://drive.google.com/uc?id=1-HxJOVDzq8Gw9_DkNd1l5ZlTQF_qdHn3'
+    output = 'siamese_model.h5'
+    gdown.download(url, output, quiet=False)
+    return load_model('siamese_model.h5')
 
-    # Convert images to grayscale
-    gray1 = cv2.cvtColor(image1, cv2.COLOR_RGB2GRAY)
-    gray2 = cv2.cvtColor(image2, cv2.COLOR_RGB2GRAY)
+# Load the face detection cascade
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-    # Load the face detector
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+# Load the Siamese model
+model = download_model()
 
+def preprocess_image(image):
+    # Convert PIL Image to numpy array
+    image = np.array(image)
+    
+    # Convert to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    
     # Detect faces
-    faces1 = face_cascade.detectMultiScale(gray1, 1.1, 4)
-    faces2 = face_cascade.detectMultiScale(gray2, 1.1, 4)
+    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+    
+    if len(faces) == 0:
+        return None
+    
+    # Get the first face
+    x, y, w, h = faces[0]
+    
+    # Extract face ROI
+    face = image[y:y+h, x:x+w]
+    
+    # Resize to 224x224 (input size for ResNet50)
+    face = cv2.resize(face, (224, 224))
+    
+    # Preprocess for ResNet50
+    face = preprocess_input(face)
+    
+    return face
 
-    if len(faces1) == 0 or len(faces2) == 0:
+def verify_faces(image1, image2):
+    # Preprocess both images
+    face1 = preprocess_image(image1)
+    face2 = preprocess_image(image2)
+    
+    if face1 is None or face2 is None:
         return "No face found in one or both images."
-
-    # Get the first face from each image
-    x1, y1, w1, h1 = faces1[0]
-    x2, y2, w2, h2 = faces2[0]
-
-    # Extract face ROIs
-    face1 = gray1[y1:y1+h1, x1:x1+w1]
-    face2 = gray2[y2:y2+h2, x2:x2+w2]
-
-    # Resize faces to the same size
-    face1 = cv2.resize(face1, (100, 100))
-    face2 = cv2.resize(face2, (100, 100))
-
-    # Compare faces using Mean Squared Error (MSE)
-    mse = np.mean((face1 - face2) ** 2)
-    similarity = 1 / (1 + mse)  # Convert MSE to a similarity score
-
+    
+    # Expand dimensions to create a batch
+    face1 = np.expand_dims(face1, axis=0)
+    face2 = np.expand_dims(face2, axis=0)
+    
+    # Make prediction
+    similarity = model.predict([face1, face2])[0][0]
+    
     return similarity
 
 def main():
@@ -63,9 +87,9 @@ def main():
         image1 = Image.open(image1)
         image2 = Image.open(image2)
 
-        # Perform face similarity check
-        if st.button("Check Similarity"):
-            similarity = face_similarity_check(image1, image2)
+        # Perform face verification
+        if st.button("Verify Faces"):
+            similarity = verify_faces(image1, image2)
             if isinstance(similarity, str):
                 st.error(similarity)
             else:
@@ -77,4 +101,4 @@ def main():
                     st.markdown('<h2 style="color:red;"> Face Not Verified!</h2>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()
+    main()         
