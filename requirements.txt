@@ -1,5 +1,6 @@
 streamlit==1.31.1
 opencv-python-headless
 deepface
+tf-keras
 numpy==1.26.4
 pillow==10.2.0
