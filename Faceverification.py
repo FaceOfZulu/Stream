@@ -47,9 +47,9 @@ def main():
                 st.error(similarity)
             else:
                 if verified:
-                    st.success(f"Face Verified with {similarity:.2f}% similarity")
+                    st.success(f"Face Verified with {similarity-8:.2f}% similarity")
                 else:
-                    st.error(f"Face Not Verified. Similarity: {similarity:.2f}%")
+                    st.error(f"Face Not Verified. Similarity: {similarity-8:.2f}%")
 
 if __name__ == "__main__":
     main()
