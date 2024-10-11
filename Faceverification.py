@@ -1,25 +1,19 @@
 import streamlit as st
+import cv2
 import numpy as np
 from PIL import Image
-import cv2
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.applications.resnet50 import preprocess_input
 import gdown
 
-# Download the pre-trained model
+# Download the pre-trained face recognition model
 @st.cache_resource
 def download_model():
-    url = 'https://drive.google.com/uc?id=1-HxJOVDzq8Gw9_DkNd1l5ZlTQF_qdHn3'
-    output = 'siamese_model.h5'
+    url = 'https://github.com/opencv/opencv/raw/master/data/haarcascades/haarcascade_frontalface_default.xml'
+    output = 'haarcascade_frontalface_default.xml'
     gdown.download(url, output, quiet=False)
-    return load_model('siamese_model.h5', compile=False)
+    return cv2.CascadeClassifier(output)
 
 # Load the face detection cascade
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-
-# Load the Siamese model
-model = download_model()
+face_cascade = download_model()
 
 def preprocess_image(image):
     # Convert PIL Image to numpy array
@@ -38,13 +32,10 @@ def preprocess_image(image):
     x, y, w, h = faces[0]
     
     # Extract face ROI
-    face = image[y:y+h, x:x+w]
+    face = gray[y:y+h, x:x+w]
     
-    # Resize to 224x224 (input size for ResNet50)
-    face = cv2.resize(face, (224, 224))
-    
-    # Preprocess for ResNet50
-    face = preprocess_input(face)
+    # Resize to a standard size
+    face = cv2.resize(face, (100, 100))
     
     return face
 
@@ -56,14 +47,11 @@ def verify_faces(image1, image2):
     if face1 is None or face2 is None:
         return "No face found in one or both images."
     
-    # Expand dimensions to create a batch
-    face1 = np.expand_dims(face1, axis=0)
-    face2 = np.expand_dims(face2, axis=0)
+    # Compare faces using Mean Squared Error (MSE)
+    mse = np.mean((face1 - face2) ** 2)
+    similarity = 1 / (1 + mse)  # Convert MSE to a similarity score
     
-    # Make prediction
-    similarity = model.predict([face1, face2], verbose=0)[0][0]
-    
-    return float(similarity)
+    return similarity
 
 def main():
     st.markdown("<h1 style='text-align: center'><strong>Facial Verification System</strong></h1>", unsafe_allow_html=True)
