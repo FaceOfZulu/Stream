@@ -1,45 +1,56 @@
 import streamlit as st
-import face_recognition
+import cv2
 import numpy as np
 from PIL import Image
-import io
 
 def face_similarity_check(image1, image2):
-    # Convert Streamlit images to numpy arrays
+    # Convert PIL Images to numpy arrays
     image1 = np.array(image1)
     image2 = np.array(image2)
 
-    # Find face locations
-    face_locations1 = face_recognition.face_locations(image1)
-    face_locations2 = face_recognition.face_locations(image2)
+    # Convert images to grayscale
+    gray1 = cv2.cvtColor(image1, cv2.COLOR_RGB2GRAY)
+    gray2 = cv2.cvtColor(image2, cv2.COLOR_RGB2GRAY)
 
-    if not face_locations1 or not face_locations2:
+    # Load the face detector
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+    # Detect faces
+    faces1 = face_cascade.detectMultiScale(gray1, 1.1, 4)
+    faces2 = face_cascade.detectMultiScale(gray2, 1.1, 4)
+
+    if len(faces1) == 0 or len(faces2) == 0:
         return "No face found in one or both images."
 
-    # Get face encodings
-    face_encoding1 = face_recognition.face_encodings(image1, face_locations1)[0]
-    face_encoding2 = face_recognition.face_encodings(image2, face_locations2)[0]
+    # Get the first face from each image
+    x1, y1, w1, h1 = faces1[0]
+    x2, y2, w2, h2 = faces2[0]
 
-    # Compare faces
-    face_distance = face_recognition.face_distance([face_encoding1], face_encoding2)[0]
-    similarity = 1 - face_distance
+    # Extract face ROIs
+    face1 = gray1[y1:y1+h1, x1:x1+w1]
+    face2 = gray2[y2:y2+h2, x2:x2+w2]
+
+    # Resize faces to the same size
+    face1 = cv2.resize(face1, (100, 100))
+    face2 = cv2.resize(face2, (100, 100))
+
+    # Compare faces using Mean Squared Error (MSE)
+    mse = np.mean((face1 - face2) ** 2)
+    similarity = 1 / (1 + mse)  # Convert MSE to a similarity score
 
     return similarity
 
 def main():
     st.markdown("<h1 style='text-align: center'><strong>Facial Verification System</strong></h1>", unsafe_allow_html=True)
     
-
     # File uploader for the second image
     st.markdown("<h4 style='text-align: center'><strong>Upload the anchor image</strong></h4>", unsafe_allow_html=True)
     image2 = st.file_uploader("", type=['jpg', 'jpeg', 'png'])
-
 
     # Webcam input for the first image
     st.markdown("<h4 style='text-align: center'><strong>Capture the live image to verify </strong></h4>", unsafe_allow_html=True)
     image1 = st.camera_input(" ")
 
-    
     if image1 and image2:
         # Display the captured image
         col1, col2 = st.columns(2)
@@ -58,8 +69,7 @@ def main():
             if isinstance(similarity, str):
                 st.error(similarity)
             else:
-                
-                if similarity > 0.7:
+                if similarity > 0.5:  # Adjust this threshold as needed
                     st.success(f"Similarity Score: {similarity * 100:.2f} %")
                     st.markdown('<h2 style="color:green;"> Face Verified!</h2>', unsafe_allow_html=True)
                 else:
