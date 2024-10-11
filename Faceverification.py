@@ -1,3 +1,4 @@
+import streamlit as st
 import numpy as np
 from PIL import Image
 import cv2
@@ -12,7 +13,7 @@ def download_model():
     url = 'https://drive.google.com/uc?id=1-HxJOVDzq8Gw9_DkNd1l5ZlTQF_qdHn3'
     output = 'siamese_model.h5'
     gdown.download(url, output, quiet=False)
-    return load_model('siamese_model.h5')
+    return load_model('siamese_model.h5', compile=False)
 
 # Load the face detection cascade
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -60,9 +61,9 @@ def verify_faces(image1, image2):
     face2 = np.expand_dims(face2, axis=0)
     
     # Make prediction
-    similarity = model.predict([face1, face2])[0][0]
+    similarity = model.predict([face1, face2], verbose=0)[0][0]
     
-    return similarity
+    return float(similarity)
 
 def main():
     st.markdown("<h1 style='text-align: center'><strong>Facial Verification System</strong></h1>", unsafe_allow_html=True)
@@ -101,4 +102,4 @@ def main():
                     st.markdown('<h2 style="color:red;"> Face Not Verified!</h2>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()         
+    main()
